@@ -4,11 +4,17 @@
 static int unionfs_getattr(const char *path, struct stat *stbuf,
                            struct fuse_file_info *fi) {
     (void)fi;
-    (void)path;
-    (void)stbuf;
 
-    /* TODO Day 2: call resolve_path, then lstat on resolved path */
-    return -ENOENT;
+    char resolved[PATH_MAX];
+    bool is_upper;
+
+    int ret = resolve_path(path, resolved, &is_upper);
+    if (ret < 0) return ret;
+
+    if (lstat(resolved, stbuf) == -1)
+        return -errno;
+
+    return 0;
 }
 
 extern struct fuse_operations unionfs_oper;
