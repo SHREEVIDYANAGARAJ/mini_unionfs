@@ -22,7 +22,8 @@ struct mini_unionfs_state {
 #define UNIONFS_DATA \
     ((mini_unionfs_state *) fuse_get_context()->private_data)
 
-/* TODO Day 2: declare resolve_path once resolver.cpp is added */
-/* TODO Day 3: declare copy_to_upper and ensure_upper_dir      */
+int resolve_path(const char *path, char *resolved, bool *is_upper);
+int copy_to_upper(const char *path);
+int ensure_upper_dir(const char *path);
 
 #endif
