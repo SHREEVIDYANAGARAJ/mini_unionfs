@@ -18,7 +18,7 @@ struct mini_unionfs_state {
     const char *lower_dir;
     const char *upper_dir;
 };
-
+# 
 #define UNIONFS_DATA \
     ((mini_unionfs_state *) fuse_get_context()->private_data)
 
