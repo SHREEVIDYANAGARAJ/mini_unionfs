@@ -3,38 +3,50 @@
 
 static int unionfs_open(const char *path,
                         struct fuse_file_info *fi) {
-    (void)path; (void)fi;
-
-
     char resolved[PATH_MAX];
     bool is_upper;
 
     int ret = resolve_path(path, resolved, &is_upper);
     if (ret < 0) return ret;
 
+    /* CoW trigger: file is in lower and caller wants to write */
+    if (!is_upper && (fi->flags & (O_WRONLY | O_RDWR))) {
+        ret = copy_to_upper(path);
+        if (ret < 0) return ret;
+        snprintf(resolved, PATH_MAX, "%s%s",
+                 UNIONFS_DATA->upper_dir, path);
+    }
+
     int fd = open(resolved, fi->flags);
     if (fd == -1) return -errno;
 
-    close(fd);
+    /* Store fd in fi->fh so read/write reuse it */
+    fi->fh = (uint64_t)fd;
     return 0;
 }
 
 static int unionfs_read(const char *path, char *buf,
                         size_t size, off_t offset,
                         struct fuse_file_info *fi) {
-    (void)fi;
+    (void)path;
+    int fd;
+    bool own_fd = false;
 
-    char resolved[PATH_MAX];
-    bool is_upper;
-
-    int ret = resolve_path(path, resolved, &is_upper);
-    if (ret < 0) return ret;
-
-    int fd = open(resolved, O_RDONLY);
-    if (fd == -1) return -errno;
+    if (fi && fi->fh) {
+        fd = (int)fi->fh;
+    } else {
+        /* Fallback: no prior open, resolve and open ourselves */
+        char resolved[PATH_MAX];
+        bool is_upper;
+        int ret = resolve_path(path, resolved, &is_upper);
+        if (ret < 0) return ret;
+        fd = open(resolved, O_RDONLY);
+        if (fd == -1) return -errno;
+        own_fd = true;
+    }
 
     ssize_t res = pread(fd, buf, size, offset);
-    close(fd);
+    if (own_fd) close(fd);
 
     if (res == -1) return -errno;
     return (int)res;
